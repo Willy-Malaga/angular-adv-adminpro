@@ -1,12 +1,16 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, NgZone } from '@angular/core';
+import { Router } from '@angular/router';
+
 import { tap, map, catchError } from 'rxjs/operators';
 import { Observable, of } from 'rxjs';
-import { Router } from '@angular/router';
+
 import { environment } from '../../environments/environment';
 
 import { RegisterForm } from '../interfaces/register-form.interface';
 import { LoginForm } from '../interfaces/login-form.interface';
+import { CargarUsuario } from '../interfaces/cargar-usuarios.interface';
+
 import { Usuario } from '../models/usuario.model';
 
 const base_url = environment.base_url;
@@ -34,6 +38,14 @@ export class UsuarioService {
 
   get uid(): string {
     return this.usuario.uid || '';
+  }
+
+  get headers() {
+    return {
+      headers: {
+        'x-token': this.token,
+      },
+    };
   }
 
   googleInit() {
@@ -85,17 +97,18 @@ export class UsuarioService {
     );
   }
 
-  actualizarPerfil(data: { email: string, nombre: string, role: string }) {
+  actualizarPerfil(data: { email: string; nombre: string; role: string }) {
+
     data = {
       ...data,
       role: this.usuario.role
-    };
+    }
 
-    return this.http.put(`${base_url}/usuarios/${this.uid}`, data, {
-      headers: {
-        'x-token': this.token,
-      },
-    });
+    return this.http.put(
+      `${base_url}/usuarios/${this.uid}`,
+      data,
+      this.headers
+    );
   }
 
   login(formData: LoginForm) {
@@ -110,6 +123,45 @@ export class UsuarioService {
       tap((resp: any) => {
         localStorage.setItem('token', resp.token);
       })
+    );
+  }
+
+  cargarUsuarios(desde: number = 0) {
+    // http://localhost:3000/api/usuarios?desde=0
+    const url = `${base_url}/usuarios?desde=${desde}`;
+    return this.http.get<CargarUsuario>(url, this.headers).pipe(
+      map((resp) => {
+        const usuarios = resp.usuarios.map(
+          (user) =>
+            new Usuario(
+              user.nombre,
+              user.email,
+              '',
+              user.img,
+              user.google,
+              user.role,
+              user.uid
+            )
+        );
+        return {
+          total: resp.total,
+          usuarios,
+        };
+      })
+    );
+  }
+
+  eliminarUsuario(usuario: Usuario) {
+    // /usuarios/5fd7df87cc8cb762d84f1226
+    const url = `${base_url}/usuarios/${usuario.uid}`;
+    return this.http.delete(url, this.headers);
+  }
+
+  guardarUsuario(usuario: Usuario) {
+    return this.http.put(
+      `${base_url}/usuarios/${usuario.uid}`,
+      usuario,
+      this.headers
     );
   }
 }
